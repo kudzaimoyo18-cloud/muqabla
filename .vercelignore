@@ -1,15 +1,27 @@
 # Dependencies
-node_modules
+node_modules/
+web/node_modules/
 .npm
 .yarn
 
 # Build outputs
-.expo
-.next
+.expo/
+.next/
+dist/
+web-build/
+
+# Expo mobile app (not needed for web deploy)
+app/
+assets/
+ios/
+android/
+.expo-shared/
+expo-env.d.ts
+babel.config.js
 
 # Debug
-.vscode
-.idea
+.vscode/
+.idea/
 
 # OS
 .DS_Store
@@ -20,9 +32,18 @@ Thumbs.db
 .env.local
 .env.*
 
-# Expo
-.expo-shared
+# Logs
 *.log
 
 # Vercel
-.vercel
+.vercel/
+
+# Claude/IDE
+.claude/
+
+# Large files
+*.iso
+*.mp4
+*.mov
+*.avi
+*.mkv

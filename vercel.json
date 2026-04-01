@@ -1,8 +1,8 @@
 {
-  "buildCommand": "expo export",
-  "outputDirectory": "dist",
+  "buildCommand": "cd web && npm install && npm run build",
+  "outputDirectory": "web/.next",
   "framework": null,
-  "installCommand": "npm install",
-  "devCommand": "expo start --web",
+  "installCommand": "cd web && npm install",
+  "devCommand": "cd web && npm run dev",
   "cleanUrls": true
 }
