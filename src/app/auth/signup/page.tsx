@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Video, Mail, Lock, User, ArrowRight, Loader2, Briefcase, UserCircle } from 'lucide-react';
-import { signUpWithEmail, createUserProfile, createCandidateProfile, createCompany, createEmployerProfile } from '@/lib/supabase/helpers';
 import { supabase } from '@/lib/supabase/client';
 
 type Step = 'details' | 'role';
@@ -17,51 +16,44 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [userId, setUserId] = useState<string | null>(null);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (!fullName.trim() || !email.trim() || !password.trim()) return;
     setError('');
-
-    try {
-      const { data, error: authError } = await signUpWithEmail(email, password);
-      if (authError) throw authError;
-      if (data.user) {
-        setUserId(data.user.id);
-        setStep('role');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account');
-    } finally {
-      setLoading(false);
-    }
+    setStep('role');
   };
 
   const handleRoleSelect = async (role: 'candidate' | 'employer') => {
-    if (!userId) return;
     setLoading(true);
     setError('');
 
     try {
-      const { error: profileError } = await createUserProfile(userId, role, fullName, '', email);
-      if (profileError) throw profileError;
+      // Server-side signup: creates auth user (auto-confirmed) + users + candidates/employers rows
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, fullName, role }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Signup failed');
+
+      // Sign in the user on the client side (user was auto-confirmed server-side)
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) throw signInError;
 
       if (role === 'candidate') {
-        // Create candidate row so profile page can load/update it
-        const { error: candError } = await createCandidateProfile(userId, {});
-        if (candError) throw candError;
         router.push('/profile?setup=true');
       } else {
-        // Create a default company and employer row
-        const { data: company, error: compError } = await createCompany({ name: `${fullName}'s Company` });
-        if (compError) throw compError;
-        const { error: empError } = await createEmployerProfile(userId, company.id, {});
-        if (empError) throw empError;
         router.push('/employer/dashboard?setup=true');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to set up profile');
+      setError(err.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }

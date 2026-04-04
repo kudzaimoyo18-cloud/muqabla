@@ -30,8 +30,8 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Supabase
-supabase
+# Supabase CLI
+/supabase
 .local/share/supabase
 
 # Next.js
@@ -58,3 +58,5 @@ dist/
 .env.production.local
 .env.backup
 .env.backup_*
+
+.vercel
