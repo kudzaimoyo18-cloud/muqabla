@@ -6,7 +6,9 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const redirect = searchParams.get('redirect') || '/feed';
 
-  const response = NextResponse.redirect(new URL(redirect, request.url));
+  // Build the final redirect URL (may be overridden for new OAuth users)
+  let redirectUrl = new URL(redirect, request.url);
+  const response = NextResponse.redirect(redirectUrl);
 
   if (code) {
     const supabase = createServerClient(
@@ -25,7 +27,28 @@ export async function GET(request: NextRequest) {
         },
       }
     );
-    await supabase.auth.exchangeCodeForSession(code);
+
+    const { data: sessionData } = await supabase.auth.exchangeCodeForSession(code);
+
+    // For new OAuth users, check if they have a profile in public.users
+    if (sessionData?.user) {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', sessionData.user.id)
+        .single();
+
+      if (!existingUser) {
+        // New user — redirect to role selection (keep the auth cookies!)
+        const roleUrl = new URL('/auth/role', request.url);
+        const roleResponse = NextResponse.redirect(roleUrl);
+        // Copy auth cookies from the original response
+        response.cookies.getAll().forEach((cookie) => {
+          roleResponse.cookies.set(cookie.name, cookie.value);
+        });
+        return roleResponse;
+      }
+    }
   }
 
   return response;
