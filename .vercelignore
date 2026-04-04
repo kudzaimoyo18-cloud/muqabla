@@ -11,8 +11,8 @@ dist/
 web-build/
 
 # Expo mobile app (not needed for web deploy)
-app/
-assets/
+/app/
+/assets/
 ios/
 android/
 .expo-shared/
