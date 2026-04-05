@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -16,8 +17,18 @@ function getAdminClient() {
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 5 signups per IP per minute
+    const ip = getClientIp(request);
+    const { success, resetIn } = rateLimit(`signup:${ip}`, { maxRequests: 5, windowMs: 60_000 });
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(resetIn / 1000)) } }
+      );
+    }
+
     const body = await request.text();
-    let email: string, password: string, fullName: string, role: string;
+    let email: string, password: string, fullName: string, role: string; /* eslint-disable-line prefer-const */
 
     try {
       const parsed = JSON.parse(body);
@@ -33,6 +44,23 @@ export async function POST(request: Request) {
     if (!email || !password || !fullName || !role) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (typeof email !== 'string' || !emailRegex.test(email) || email.length > 254) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
+
+    // Validate password strength
+    if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+      return NextResponse.json({ error: 'Password must be 8-128 characters' }, { status: 400 });
+    }
+
+    // Sanitize full name — strip HTML/script tags, limit length
+    if (typeof fullName !== 'string' || fullName.trim().length < 1 || fullName.length > 200) {
+      return NextResponse.json({ error: 'Invalid name' }, { status: 400 });
+    }
+    fullName = fullName.replace(/<[^>]*>/g, '').trim();
 
     if (!['candidate', 'employer'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
@@ -50,7 +78,11 @@ export async function POST(request: Request) {
 
     if (authError) {
       console.error('Auth create error:', authError.message);
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+      // Only expose safe error messages to the client
+      const safeMessage = authError.message?.includes('already registered')
+        ? 'An account with this email already exists'
+        : 'Failed to create account';
+      return NextResponse.json({ error: safeMessage }, { status: 400 });
     }
 
     const userId = authData.user.id;
@@ -71,7 +103,7 @@ export async function POST(request: Request) {
     if (userError) {
       console.error('User profile error:', userError.message);
       await admin.auth.admin.deleteUser(userId);
-      return NextResponse.json({ error: userError.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
     }
 
     // 3. Create role-specific profile
@@ -139,6 +171,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('Signup error:', error?.message || error);
-    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

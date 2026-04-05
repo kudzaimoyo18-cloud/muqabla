@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -12,12 +14,43 @@ function getAdminClient() {
   });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 requests per IP per minute
+    const ip = getClientIp(request);
+    const { success, resetIn } = rateLimit(`oauth-profile:${ip}`, { maxRequests: 5, windowMs: 60_000 });
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(resetIn / 1000)) } }
+      );
+    }
+
+    // Verify the caller is authenticated and matches the userId
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return request.cookies.getAll(); },
+          setAll() {},
+        },
+      }
+    );
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { userId, email, fullName, role } = await request.json();
 
     if (!userId || !email || !fullName || !role) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Ensure the authenticated user can only create their own profile
+    if (userId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     if (!['candidate', 'employer'].includes(role)) {
@@ -52,7 +85,7 @@ export async function POST(request: Request) {
 
     if (userError) {
       console.error('User profile error:', userError.message);
-      return NextResponse.json({ error: userError.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
     }
 
     // Create role-specific profile
@@ -120,6 +153,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error('OAuth profile error:', error?.message || error);
-    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

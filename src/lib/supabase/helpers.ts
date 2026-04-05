@@ -153,20 +153,40 @@ export async function getJobsFeed(cursor?: string, limit = 10) {
   return query;
 }
 
+// Escape special characters for PostgREST ilike filters
+function sanitizeSearchInput(input: string): string {
+  return input
+    .replace(/\\/g, '\\\\')  // escape backslashes first
+    .replace(/%/g, '\\%')    // escape wildcard %
+    .replace(/_/g, '\\_')    // escape wildcard _
+    .replace(/[(),."']/g, '') // strip characters that could break PostgREST filter syntax
+    .trim()
+    .slice(0, 200);           // limit length to prevent abuse
+}
+
 export async function searchJobs(filters: Record<string, unknown>, limit = 20) {
   let query = supabase
     .from('jobs')
     .select('*, company:companies(*)')
     .eq('status', 'active');
 
-  if (filters.query) {
-    query = query.or(`title.ilike.%${filters.query}%,description.ilike.%${filters.query}%`);
+  if (filters.query && typeof filters.query === 'string' && filters.query.trim()) {
+    const q = sanitizeSearchInput(filters.query);
+    if (q) {
+      query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%`);
+    }
   }
-  if (filters.city) query = query.ilike('city', `%${filters.city}%`);
-  if (filters.job_type) query = query.eq('job_type', filters.job_type);
-  if (filters.work_mode) query = query.eq('work_mode', filters.work_mode);
+  if (filters.city && typeof filters.city === 'string') {
+    query = query.ilike('city', `%${sanitizeSearchInput(filters.city)}%`);
+  }
+  if (filters.job_type && typeof filters.job_type === 'string') {
+    query = query.eq('job_type', filters.job_type);
+  }
+  if (filters.work_mode && typeof filters.work_mode === 'string') {
+    query = query.eq('work_mode', filters.work_mode);
+  }
 
-  return query.order('created_at', { ascending: false }).limit(limit);
+  return query.order('created_at', { ascending: false }).limit(Math.min(limit, 100));
 }
 
 // ============ APPLICATION HELPERS ============

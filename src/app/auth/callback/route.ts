@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+function secureCookieOptions(options?: Record<string, unknown>) {
+  return {
+    ...options,
+    secure: isProduction,
+    sameSite: 'lax' as const,
+    path: '/',
+  };
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  const redirect = searchParams.get('redirect') || '/feed';
+  const rawRedirect = searchParams.get('redirect') || '/feed';
 
-  // Build the final redirect URL (may be overridden for new OAuth users)
+  // Only allow relative paths — prevent open redirect attacks
+  const redirect = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/feed';
   let redirectUrl = new URL(redirect, request.url);
   const response = NextResponse.redirect(redirectUrl);
 
@@ -21,7 +33,7 @@ export async function GET(request: NextRequest) {
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
+              response.cookies.set(name, value, secureCookieOptions(options))
             );
           },
         },
@@ -42,9 +54,9 @@ export async function GET(request: NextRequest) {
         // New user — redirect to role selection (keep the auth cookies!)
         const roleUrl = new URL('/auth/role', request.url);
         const roleResponse = NextResponse.redirect(roleUrl);
-        // Copy auth cookies from the original response
+        // Copy auth cookies with security flags
         response.cookies.getAll().forEach((cookie) => {
-          roleResponse.cookies.set(cookie.name, cookie.value);
+          roleResponse.cookies.set(cookie.name, cookie.value, secureCookieOptions());
         });
         return roleResponse;
       }

@@ -17,7 +17,10 @@ export async function middleware(request: NextRequest) {
 
   if (isProtected && !user) {
     const loginUrl = new URL('/auth/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
+    // Only pass safe relative paths as redirect targets
+    if (pathname.startsWith('/') && !pathname.startsWith('//')) {
+      loginUrl.searchParams.set('redirect', pathname);
+    }
     return NextResponse.redirect(loginUrl);
   }
 

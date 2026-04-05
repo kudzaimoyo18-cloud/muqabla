@@ -1,6 +1,17 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+function secureCookieOptions(options?: Record<string, unknown>) {
+  return {
+    ...options,
+    secure: isProduction,
+    sameSite: 'lax' as const,
+    path: '/',
+  };
+}
+
 export async function createSupabaseServer() {
   const cookieStore = await cookies();
 
@@ -15,7 +26,7 @@ export async function createSupabaseServer() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, secureCookieOptions(options))
             );
           } catch {
             // Called from Server Component — safe to ignore with middleware
