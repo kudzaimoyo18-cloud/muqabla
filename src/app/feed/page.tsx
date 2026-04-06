@@ -206,16 +206,6 @@ export default function FeedPage() {
               </div>
 
               <p className="text-gray-400 text-sm line-clamp-2">{currentJob.description}</p>
-
-              {/* Swipe hints (mobile) */}
-              <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.04] md:hidden">
-                <span className="text-xs text-gray-600 flex items-center gap-1">
-                  <span className="text-emerald-400">&larr;</span> Swipe to apply
-                </span>
-                <span className="text-xs text-gray-600 flex items-center gap-1">
-                  Swipe to save <span className="text-blue-400">&rarr;</span>
-                </span>
-              </div>
             </div>
 
             {/* Action Feedback Overlay */}
