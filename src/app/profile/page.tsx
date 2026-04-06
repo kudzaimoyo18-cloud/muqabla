@@ -88,7 +88,7 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
     if (!file || !user?.id) return;
     setUploading(true);
     try {
-      const res = await fetch('/api/upload', { method: 'POST' });
+      const res = await fetch('/api/upload?type=profile_video', { method: 'POST' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       const formData = new FormData();
@@ -137,9 +137,9 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
       <div className="px-4 max-w-lg mx-auto space-y-4">
         {/* Video */}
         <div className="bg-[#111] border border-white/[0.06] rounded-xl overflow-hidden">
-          {candidate?.profile_video_id ? (
+          {candidate?.profile_video?.cloudflare_uid ? (
             <div className="aspect-[9/16] max-h-[300px] relative">
-              <iframe src={`${getEmbedUrl(candidate.profile_video_id)}?muted=true&autoplay=false`} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen />
+              <iframe src={`${getEmbedUrl(candidate.profile_video.cloudflare_uid)}?muted=true&autoplay=false`} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen />
               {editing && (
                 <label className="absolute bottom-3 right-3 w-10 h-10 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-colors">
                   <Camera className="w-5 h-5 text-white" />
@@ -372,7 +372,7 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
     if (!file || !employer?.company_id) return;
     setUploading(true);
     try {
-      const res = await fetch('/api/upload', { method: 'POST' });
+      const res = await fetch('/api/upload?type=company_intro', { method: 'POST' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       const formData = new FormData();
@@ -422,9 +422,9 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
 
         {/* Company Intro Video */}
         <div className="bg-[#111] border border-white/[0.06] rounded-xl overflow-hidden">
-          {company?.intro_video_id ? (
+          {company?.intro_video?.cloudflare_uid ? (
             <div className="aspect-video relative">
-              <iframe src={`${getEmbedUrl(company.intro_video_id)}?muted=true&autoplay=false`} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen />
+              <iframe src={`${getEmbedUrl(company.intro_video.cloudflare_uid)}?muted=true&autoplay=false`} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen />
               {editing && (
                 <label className="absolute bottom-3 right-3 w-10 h-10 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-colors">
                   <Camera className="w-5 h-5 text-white" />

@@ -126,10 +126,10 @@ export default function FeedPage() {
           >
             {/* Video / Visual Area */}
             <div className="flex-1 relative bg-gradient-to-b from-gray-900 to-[#0a0a0a] overflow-hidden">
-              {currentJob.video_id ? (
+              {currentJob.cloudflare_uid ? (
                 <div className="absolute inset-0">
                   <iframe
-                    src={`${getEmbedUrl(currentJob.video_id)}?muted=${muted}&autoplay=true&loop=true`}
+                    src={`${getEmbedUrl(currentJob.cloudflare_uid)}?muted=${muted}&autoplay=true&loop=true`}
                     className="w-full h-full"
                     allow="autoplay; fullscreen"
                     allowFullScreen

@@ -19,6 +19,7 @@ interface JobFeedItem {
   seniority: string;
   requirements: string[];
   video_id?: string;
+  cloudflare_uid?: string;
   created_at: string;
 }
 
@@ -56,7 +57,8 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         .select(`
           id, title, description, city, country, salary_min, salary_max, salary_currency,
           job_type, work_mode, seniority, requirements, video_id, created_at,
-          companies:company_id (name, logo_url)
+          companies:company_id (name, logo_url),
+          videos:video_id (id, cloudflare_uid)
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -80,6 +82,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         seniority: job.seniority,
         requirements: job.requirements || [],
         video_id: job.video_id,
+        cloudflare_uid: job.videos?.cloudflare_uid || null,
         created_at: job.created_at,
       }));
 

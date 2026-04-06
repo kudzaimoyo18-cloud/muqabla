@@ -94,7 +94,7 @@ export async function createCandidateProfile(userId: string, profileData: Record
 }
 
 export async function getCandidateProfile(userId: string) {
-  return supabase.from('candidates').select('*').eq('id', userId).single();
+  return supabase.from('candidates').select('*, profile_video:profile_video_id (id, cloudflare_uid)').eq('id', userId).single();
 }
 
 export async function updateCandidateProfile(userId: string, updates: Record<string, unknown>) {
@@ -106,7 +106,7 @@ export async function updateCandidateProfile(userId: string, updates: Record<str
 export async function getEmployerProfile(userId: string) {
   return supabase
     .from('employers')
-    .select('*, company:companies(*)')
+    .select('*, company:companies(*, intro_video:intro_video_id (id, cloudflare_uid))')
     .eq('id', userId)
     .single();
 }

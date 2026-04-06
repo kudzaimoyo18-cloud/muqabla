@@ -26,6 +26,7 @@ interface CandidateApplication {
   country?: string;
   ai_extracted_skills?: string[];
   profile_video_id?: string;
+  cloudflare_uid?: string;
 }
 
 const STATUS_OPTIONS = ['pending', 'viewed', 'shortlisted', 'interviewing', 'offered', 'hired', 'rejected'];
@@ -87,7 +88,7 @@ export default function CandidatesPage() {
         applications.map(async (app) => {
           const { data: cand } = await supabase
             .from('candidates')
-            .select('headline, city, country, ai_extracted_skills, profile_video_id')
+            .select('headline, city, country, ai_extracted_skills, profile_video_id, profile_video:profile_video_id (id, cloudflare_uid)')
             .eq('id', app.candidate_id)
             .single();
           const { data: userData } = await supabase
@@ -106,6 +107,7 @@ export default function CandidatesPage() {
             country: cand?.country,
             ai_extracted_skills: cand?.ai_extracted_skills,
             profile_video_id: cand?.profile_video_id,
+            cloudflare_uid: (cand as any)?.profile_video?.cloudflare_uid || null,
           } as unknown as CandidateApplication;
         })
       );
@@ -218,9 +220,9 @@ export default function CandidatesPage() {
                     {c.headline && <p className="text-xs text-gray-400 mt-0.5 truncate">{c.headline}</p>}
                     <p className="text-[11px] text-gray-600 mt-1">Applied for: {c.job_title}</p>
                   </div>
-                  {c.profile_video_id && (
+                  {c.cloudflare_uid && (
                     <button
-                      onClick={() => setWatchingVideo(c.profile_video_id!)}
+                      onClick={() => setWatchingVideo(c.cloudflare_uid!)}
                       className="w-9 h-9 bg-emerald-500/10 rounded-full flex items-center justify-center ml-3 hover:bg-emerald-500/20 transition-colors"
                     >
                       <Play className="w-4 h-4 text-emerald-400" />
@@ -273,9 +275,9 @@ export default function CandidatesPage() {
                   <p className="text-sm font-medium text-white truncate">{c.full_name}</p>
                   <p className="text-[11px] text-gray-500 truncate">{c.headline || c.job_title}</p>
                 </div>
-                {c.profile_video_id && (
+                {c.cloudflare_uid && (
                   <button
-                    onClick={() => setWatchingVideo(c.profile_video_id!)}
+                    onClick={() => setWatchingVideo(c.cloudflare_uid!)}
                     className="w-7 h-7 bg-emerald-500/10 rounded-full flex items-center justify-center"
                   >
                     <Play className="w-3 h-3 text-emerald-400" />
