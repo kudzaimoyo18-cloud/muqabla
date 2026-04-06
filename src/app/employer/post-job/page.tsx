@@ -119,7 +119,6 @@ export default function PostJobPage() {
           company_id: companyId,
           video_id: videoId,
           status: 'active',
-          views_count: 0,
           applications_count: 0,
         });
 
