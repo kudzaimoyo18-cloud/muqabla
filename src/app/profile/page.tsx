@@ -298,6 +298,7 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
   const [editing, setEditing] = useState(isSetup);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const [form, setForm] = useState({
     company_name: '',
@@ -336,25 +337,34 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
   const handleSave = async () => {
     if (!user?.id || !employer?.company_id) return;
     setSaving(true);
+    setSaveError('');
 
-    if (form.full_name && form.full_name !== profile?.full_name) {
-      await updateUserProfile(user.id, { full_name: form.full_name });
+    try {
+      if (form.full_name && form.full_name !== profile?.full_name) {
+        const { error: userErr } = await updateUserProfile(user.id, { full_name: form.full_name });
+        if (userErr) throw new Error(userErr.message || 'Failed to update name');
+      }
+
+      const { error: compErr } = await updateCompanyProfile(employer.company_id, {
+        name: form.company_name,
+        industry: form.industry,
+        size: form.size,
+        founded_year: form.founded_year ? parseInt(form.founded_year) : null,
+        website: form.website,
+        description: form.description,
+        headquarters: form.headquarters,
+      });
+
+      if (compErr) throw new Error(compErr.message || 'Failed to save company info');
+
+      await loadProfile();
+      setEditing(false);
+      if (isSetup) router.push('/employer/dashboard');
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to save changes');
+    } finally {
+      setSaving(false);
     }
-
-    await updateCompanyProfile(employer.company_id, {
-      name: form.company_name,
-      industry: form.industry,
-      size: form.size,
-      founded_year: form.founded_year ? parseInt(form.founded_year) : null,
-      website: form.website,
-      description: form.description,
-      headquarters: form.headquarters,
-    });
-
-    await loadProfile();
-    setEditing(false);
-    setSaving(false);
-    if (isSetup) router.push('/employer/dashboard');
   };
 
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -406,6 +416,10 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
       </div>
 
       <div className="px-4 max-w-lg mx-auto space-y-4">
+        {saveError && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-4 py-3">{saveError}</div>
+        )}
+
         {/* Company Intro Video */}
         <div className="bg-[#111] border border-white/[0.06] rounded-xl overflow-hidden">
           {company?.intro_video_id ? (
