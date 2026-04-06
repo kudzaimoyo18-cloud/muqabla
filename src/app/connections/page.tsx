@@ -22,7 +22,7 @@ interface Connection {
 
 export default function ConnectionsPage() {
   const router = useRouter();
-  const { user, profile, isAuthenticated, isLoading: authLoading, initialize } = useAuthStore();
+  const { user, profile, initialize } = useAuthStore();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -30,7 +30,7 @@ export default function ConnectionsPage() {
   useEffect(() => { initialize(); }, [initialize]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
+    if (!user?.id) return;
 
     async function loadConnections() {
       setLoading(true);
@@ -76,21 +76,13 @@ export default function ConnectionsPage() {
     }
 
     loadConnections();
-  }, [isAuthenticated, user?.id]);
+  }, [user?.id]);
 
   const filtered = connections.filter((c) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return c.full_name.toLowerCase().includes(q) || (c.headline?.toLowerCase().includes(q));
   });
-
-  if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">

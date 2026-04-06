@@ -41,7 +41,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function CandidatesPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading, initialize } = useAuthStore();
+  const { user, initialize } = useAuthStore();
 
   const [candidates, setCandidates] = useState<CandidateApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ export default function CandidatesPage() {
   useEffect(() => { initialize(); }, [initialize]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
+    if (!user?.id) return;
 
     async function loadCandidates() {
       setLoading(true);
@@ -115,7 +115,7 @@ export default function CandidatesPage() {
     }
 
     loadCandidates();
-  }, [isAuthenticated, user?.id, statusFilter]);
+  }, [user?.id, statusFilter]);
 
   const handleStatusChange = async (appId: string, newStatus: string) => {
     await supabase.from('applications').update({ status: newStatus }).eq('id', appId);
@@ -134,14 +134,6 @@ export default function CandidatesPage() {
       (c.ai_extracted_skills?.some((s) => s.toLowerCase().includes(q)))
     );
   });
-
-  if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">

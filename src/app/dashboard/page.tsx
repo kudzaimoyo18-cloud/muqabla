@@ -44,7 +44,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function CandidateDashboardPage() {
   const router = useRouter();
-  const { user, profile, isAuthenticated, isLoading: authLoading, initialize } = useAuthStore();
+  const { user, profile, initialize } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats>({ totalApplications: 0, savedJobs: 0, profileViews: 0, shortlisted: 0 });
   const [recentApps, setRecentApps] = useState<RecentApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ export default function CandidateDashboardPage() {
   useEffect(() => { initialize(); }, [initialize]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
+    if (!user?.id) return;
 
     async function loadDashboard() {
       setLoading(true);
@@ -89,9 +89,9 @@ export default function CandidateDashboardPage() {
     }
 
     loadDashboard();
-  }, [isAuthenticated, user?.id]);
+  }, [user?.id]);
 
-  if (loading || authLoading || !isAuthenticated) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />

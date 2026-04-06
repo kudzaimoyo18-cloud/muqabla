@@ -30,7 +30,7 @@ interface RecentApplicant {
 
 export default function EmployerDashboardPage() {
   const router = useRouter();
-  const { user, profile, isAuthenticated, isLoading: authLoading, initialize } = useAuthStore();
+  const { user, profile, initialize } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats>({ activeJobs: 0, totalApplicants: 0, newToday: 0, totalViews: 0 });
   const [recentApplicants, setRecentApplicants] = useState<RecentApplicant[]>([]);
   const [companyName, setCompanyName] = useState('');
@@ -39,7 +39,7 @@ export default function EmployerDashboardPage() {
   useEffect(() => { initialize(); }, [initialize]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
+    if (!user?.id) return;
 
     async function loadDashboard() {
       setLoading(true);
@@ -128,9 +128,9 @@ export default function EmployerDashboardPage() {
     }
 
     loadDashboard();
-  }, [isAuthenticated, user?.id]);
+  }, [user?.id]);
 
-  if (loading || authLoading || !isAuthenticated) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />

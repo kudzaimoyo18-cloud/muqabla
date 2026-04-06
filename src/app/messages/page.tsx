@@ -32,7 +32,7 @@ function timeAgo(date: string) {
 
 export default function MessagesPage() {
   const router = useRouter();
-  const { user, profile, isAuthenticated, isLoading: authLoading, initialize } = useAuthStore();
+  const { user, profile, initialize } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -40,7 +40,7 @@ export default function MessagesPage() {
   useEffect(() => { initialize(); }, [initialize]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id || !profile) return;
+    if (!user?.id || !profile) return;
 
     async function loadConversations() {
       setLoading(true);
@@ -132,21 +132,13 @@ export default function MessagesPage() {
     }
 
     loadConversations();
-  }, [isAuthenticated, user?.id, profile]);
+  }, [user?.id, profile]);
 
   const filtered = conversations.filter((c) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return c.other_party_name.toLowerCase().includes(q) || c.job_title.toLowerCase().includes(q);
   });
-
-  if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">

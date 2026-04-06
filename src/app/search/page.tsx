@@ -58,7 +58,7 @@ interface JobResult {
 
 export default function SearchPage() {
   const router = useRouter();
-  const { isAuthenticated, profile, isLoading: authLoading, initialize } = useAuthStore();
+  const { profile, initialize } = useAuthStore();
   const { savedJobs, saveJob, appliedJobs, applyToJob } = useFeedStore();
 
   const [query, setQuery] = useState('');
@@ -100,8 +100,8 @@ export default function SearchPage() {
 
   // Load initial results
   useEffect(() => {
-    if (isAuthenticated) doSearch('', filters);
-  }, [isAuthenticated, doSearch, filters]);
+    doSearch('', filters);
+  }, [doSearch, filters]);
 
   const handleSave = async (jobId: string) => {
     if (!profile?.id || savedJobs.has(jobId)) return;
@@ -114,14 +114,6 @@ export default function SearchPage() {
   };
 
   const activeFilterCount = [filters.job_type, filters.work_mode, filters.city].filter(Boolean).length;
-
-  if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">

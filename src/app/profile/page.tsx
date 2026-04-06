@@ -576,7 +576,7 @@ function ProfileContent() {
   const searchParams = useSearchParams();
   const isSetup = searchParams.get('setup') === 'true';
 
-  const { user, profile, isAuthenticated, isLoading: authLoading, initialize, signOut } = useAuthStore();
+  const { user, profile, initialize, signOut } = useAuthStore();
 
   useEffect(() => { initialize(); }, [initialize]);
 
@@ -584,14 +584,6 @@ function ProfileContent() {
     await signOut();
     router.push('/');
   };
-
-  if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
 
   const isEmployer = profile?.type === 'employer';
 

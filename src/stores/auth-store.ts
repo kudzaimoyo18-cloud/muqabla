@@ -34,7 +34,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialize: async () => {
     try {
       set({ isLoading: true });
-      const { data: { user } } = await supabase.auth.getUser();
+
+      // Try getUser() first (server-validated), fall back to getSession() (local JWT)
+      // In production, getUser() can fail due to CSP/cookie issues while session is valid
+      let user = null;
+      const { data: userData } = await supabase.auth.getUser();
+      user = userData?.user ?? null;
+
+      if (!user) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        user = sessionData?.session?.user ?? null;
+      }
 
       if (user) {
         const { data: profile } = await getUserProfile(user.id);

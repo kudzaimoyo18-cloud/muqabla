@@ -30,7 +30,7 @@ const SENIORITY_OPTIONS = [
 
 export default function PostJobPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading, initialize } = useAuthStore();
+  const { user, initialize } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -55,11 +55,11 @@ export default function PostJobPage() {
   useEffect(() => { initialize(); }, [initialize]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
+    if (!user?.id) return;
     getEmployerProfile(user.id).then(({ data }) => {
       if (data?.company_id) setCompanyId(data.company_id);
     });
-  }, [isAuthenticated, user?.id]);
+  }, [user?.id]);
 
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -131,14 +131,6 @@ export default function PostJobPage() {
       setLoading(false);
     }
   };
-
-  if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">

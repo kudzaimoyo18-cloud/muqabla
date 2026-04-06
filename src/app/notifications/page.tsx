@@ -38,14 +38,14 @@ const NOTIFICATION_ICONS: Record<string, typeof Bell> = {
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { user, profile, isAuthenticated, isLoading: authLoading, initialize } = useAuthStore();
+  const { user, profile, initialize } = useAuthStore();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { initialize(); }, [initialize]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
+    if (!user?.id) return;
 
     async function loadNotifications() {
       setLoading(true);
@@ -72,15 +72,7 @@ export default function NotificationsPage() {
     }
 
     loadNotifications();
-  }, [isAuthenticated, user?.id]);
-
-  if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-      </div>
-    );
-  }
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">
