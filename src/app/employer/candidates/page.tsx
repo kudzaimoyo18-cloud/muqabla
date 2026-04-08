@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { getEmployerProfile } from '@/lib/supabase/helpers';
-import { getEmbedUrl } from '@/lib/cloudflare';
+import { getVideoUrl, isR2Video } from '@/lib/cloudflare';
 import { supabase } from '@/lib/supabase/client';
 import BottomNav from '@/components/layout/BottomNav';
 
@@ -189,12 +189,11 @@ export default function CandidatesPage() {
       {watchingVideo && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setWatchingVideo(null)}>
           <div className="w-full max-w-sm aspect-[9/16] rounded-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <iframe
-              src={`${getEmbedUrl(watchingVideo)}?autoplay=true`}
-              className="w-full h-full"
-              allow="autoplay; fullscreen"
-              allowFullScreen
-            />
+            {isR2Video(watchingVideo) ? (
+              <video src={getVideoUrl(watchingVideo)} className="w-full h-full object-cover" autoPlay playsInline controls />
+            ) : (
+              <iframe src={`${getVideoUrl(watchingVideo)}?autoplay=true`} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen />
+            )}
           </div>
         </div>
       )}

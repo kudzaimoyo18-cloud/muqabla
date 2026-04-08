@@ -10,7 +10,7 @@ import { useFeedStore } from '@/stores/feed-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSwipe } from '@/hooks/useSwipe';
 import BottomNav from '@/components/layout/BottomNav';
-import { getEmbedUrl } from '@/lib/cloudflare';
+import { getVideoUrl, isR2Video } from '@/lib/cloudflare';
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   full_time: 'Full Time', part_time: 'Part Time', contract: 'Contract',
@@ -128,12 +128,23 @@ export default function FeedPage() {
             <div className="flex-1 relative bg-gradient-to-b from-gray-900 to-[#0a0a0a] overflow-hidden">
               {currentJob.cloudflare_uid ? (
                 <div className="absolute inset-0">
-                  <iframe
-                    src={`${getEmbedUrl(currentJob.cloudflare_uid)}?muted=${muted}&autoplay=true&loop=true`}
-                    className="w-full h-full"
-                    allow="autoplay; fullscreen"
-                    allowFullScreen
-                  />
+                  {isR2Video(currentJob.cloudflare_uid) ? (
+                    <video
+                      src={getVideoUrl(currentJob.cloudflare_uid)}
+                      className="w-full h-full object-cover"
+                      autoPlay
+                      loop
+                      muted={muted}
+                      playsInline
+                    />
+                  ) : (
+                    <iframe
+                      src={`${getVideoUrl(currentJob.cloudflare_uid)}?muted=${muted}&autoplay=true&loop=true`}
+                      className="w-full h-full"
+                      allow="autoplay; fullscreen"
+                      allowFullScreen
+                    />
+                  )}
                   <div className="video-overlay absolute inset-0 pointer-events-none" />
                 </div>
               ) : (

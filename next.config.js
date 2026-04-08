@@ -43,7 +43,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.cloudflarestream.com",
-              "media-src 'self' blob: https://*.cloudflarestream.com https://customer-*.cloudflarestream.com",
+              "media-src 'self' blob: https://*.cloudflarestream.com https://customer-*.cloudflarestream.com https://*.r2.dev",
               "frame-src 'self' https://*.cloudflarestream.com https://iframe.cloudflarestream.com",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://upload.videodelivery.net https://*.cloudflarestream.com https://*.vercel.app",
               "font-src 'self' data:",
