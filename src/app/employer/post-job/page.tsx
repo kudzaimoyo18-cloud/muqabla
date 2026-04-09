@@ -64,21 +64,33 @@ export default function PostJobPage() {
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!user?.id) { setError('Please sign in first'); return; }
 
     setUploading(true);
+    setError('');
     try {
-      const res = await fetch('/api/upload', { method: 'POST' });
+      // Generate unique path: userId/uuid.ext
+      const ext = file.name.split('.').pop() || 'mp4';
+      const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+
+      // Upload directly to Supabase Storage (no size limit issues, CORS handled automatically)
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(storagePath, file, { contentType: file.type || 'video/mp4', upsert: false });
+      if (uploadError) throw new Error(uploadError.message);
+
+      // Create video record via API
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath, type: 'job_post' }),
+      });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const { uploadUrl, videoId: vid } = data;
 
-      const formData = new FormData();
-      formData.append('file', file);
-      await fetch(uploadUrl, { method: 'POST', body: formData });
-
-      setVideoId(vid);
-    } catch {
-      setError('Failed to upload video');
+      setVideoId(data.videoId);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to upload video');
     } finally {
       setUploading(false);
     }
@@ -141,7 +153,7 @@ export default function PostJobPage() {
         <h1 className="text-lg font-semibold text-white">Post a Job</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-4 py-4 max-w-lg mx-auto space-y-4">
+      <form onSubmit={handleSubmit} className="px-4 py-4 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto space-y-4">
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-4 py-3">{error}</div>
         )}
@@ -323,7 +335,7 @@ export default function PostJobPage() {
         </button>
       </form>
 
-      <BottomNav variant="employer" />
+      <BottomNav />
     </div>
   );
 }

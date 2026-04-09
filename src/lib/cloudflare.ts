@@ -5,12 +5,22 @@ const STREAM_URL = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_A
 // R2 public bucket URL
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://pub-a1ade910a8c54509a8de1f2e5e864e7a.r2.dev';
 
-export function isR2Video(cloudflareUid: string): boolean {
-  return cloudflareUid.startsWith('r2://');
+// Supabase Storage public URL base
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+
+export function isDirectVideo(cloudflareUid: string): boolean {
+  return cloudflareUid.startsWith('r2://') || cloudflareUid.startsWith('supabase://');
 }
 
+// Keep old name as alias for backward compat in existing code
+export const isR2Video = isDirectVideo;
+
 export function getVideoUrl(cloudflareUid: string): string {
-  if (isR2Video(cloudflareUid)) {
+  if (cloudflareUid.startsWith('supabase://')) {
+    const path = cloudflareUid.replace('supabase://', '');
+    return `${SUPABASE_URL}/storage/v1/object/public/videos/${path}`;
+  }
+  if (cloudflareUid.startsWith('r2://')) {
     const filename = cloudflareUid.replace('r2://', '');
     return `${R2_PUBLIC_URL}/${encodeURIComponent(filename)}`;
   }
@@ -65,7 +75,7 @@ export async function deleteVideo(videoId: string): Promise<boolean> {
 }
 
 export function getPlaybackUrl(videoId: string): string {
-  if (isR2Video(videoId)) return getVideoUrl(videoId);
+  if (isDirectVideo(videoId)) return getVideoUrl(videoId);
   return `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${videoId}/manifest/video.m3u8`;
 }
 

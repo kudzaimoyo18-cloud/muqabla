@@ -13,6 +13,7 @@ import {
   getEmployerProfile, updateCompanyProfile,
 } from '@/lib/supabase/helpers';
 import { getVideoUrl, isR2Video } from '@/lib/cloudflare';
+import { supabase } from '@/lib/supabase/client';
 import { cities, countries, industries, companySizes } from '@/constants';
 import BottomNav from '@/components/layout/BottomNav';
 
@@ -88,12 +89,19 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
     if (!file || !user?.id) return;
     setUploading(true);
     try {
-      const res = await fetch('/api/upload?type=profile_video', { method: 'POST' });
+      const ext = file.name.split('.').pop() || 'mp4';
+      const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(storagePath, file, { contentType: file.type || 'video/mp4', upsert: false });
+      if (uploadError) throw uploadError;
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath, type: 'profile_video' }),
+      });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const formData = new FormData();
-      formData.append('file', file);
-      await fetch(data.uploadUrl, { method: 'POST', body: formData });
       await updateCandidateProfile(user.id, { profile_video_id: data.videoId });
       await loadProfile();
     } catch { /* silent */ } finally { setUploading(false); }
@@ -134,7 +142,7 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
         </div>
       </div>
 
-      <div className="px-4 max-w-lg mx-auto space-y-4">
+      <div className="px-4 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto space-y-4">
         {/* Video */}
         <div className="bg-[#111] border border-white/[0.06] rounded-xl overflow-hidden">
           {candidate?.profile_video?.cloudflare_uid ? (
@@ -373,15 +381,22 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
 
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !employer?.company_id) return;
+    if (!file || !employer?.company_id || !user?.id) return;
     setUploading(true);
     try {
-      const res = await fetch('/api/upload?type=company_intro', { method: 'POST' });
+      const ext = file.name.split('.').pop() || 'mp4';
+      const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(storagePath, file, { contentType: file.type || 'video/mp4', upsert: false });
+      if (uploadError) throw uploadError;
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath, type: 'company_intro' }),
+      });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const formData = new FormData();
-      formData.append('file', file);
-      await fetch(data.uploadUrl, { method: 'POST', body: formData });
       await updateCompanyProfile(employer.company_id, { intro_video_id: data.videoId });
       await loadProfile();
     } catch { /* silent */ } finally { setUploading(false); }
@@ -419,7 +434,7 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
         </div>
       </div>
 
-      <div className="px-4 max-w-lg mx-auto space-y-4">
+      <div className="px-4 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto space-y-4">
         {saveError && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-4 py-3">{saveError}</div>
         )}
@@ -618,7 +633,7 @@ function ProfileContent() {
       )}
 
       {/* Sign Out — always visible in non-edit mode */}
-      <div className="px-4 max-w-lg mx-auto mt-4">
+      <div className="px-4 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto mt-4">
         <button
           onClick={handleSignOut}
           className="w-full flex items-center justify-between px-4 py-3 bg-[#111] border border-white/[0.06] rounded-xl text-sm text-red-400 hover:border-red-500/20 transition-colors"
