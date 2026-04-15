@@ -42,11 +42,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { userId, email, fullName, role } = await request.json();
+    const { userId, email, fullName, role, provider, avatarUrl } = await request.json();
 
     if (!userId || !email || !fullName || !role) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    const isLinkedin = provider === 'linkedin';
 
     // Ensure the authenticated user can only create their own profile
     if (userId !== user.id) {
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
         type: role,
         full_name: fullName,
         email,
+        avatar_url: avatarUrl || null,
         language: 'en',
         is_verified: false,
         is_active: true,
@@ -99,7 +102,8 @@ export async function POST(request: NextRequest) {
           desired_job_types: [],
           desired_industries: [],
           emirates_id_verified: false,
-          linkedin_verified: false,
+          linkedin_verified: isLinkedin,
+          linkedin_url: isLinkedin ? `https://linkedin.com/in/${fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : null,
           profile_views: 0,
           applications_count: 0,
         });

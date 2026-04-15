@@ -25,6 +25,13 @@ export async function signInWithGoogle(redirectTo: string) {
   });
 }
 
+export async function signInWithLinkedin(redirectTo: string) {
+  return supabase.auth.signInWithOAuth({
+    provider: 'linkedin_oidc',
+    options: { redirectTo },
+  });
+}
+
 export async function getCurrentUser() {
   const { data: { user }, error } = await supabase.auth.getUser();
   return { user, error };
@@ -221,4 +228,49 @@ export async function createVideoRecord(videoData: {
 
 export async function updateVideoRecord(videoId: string, updates: Record<string, unknown>) {
   return supabase.from('videos').update(updates).eq('id', videoId).select().single();
+}
+
+// ============ MESSAGING HELPERS ============
+
+export async function getOrCreateConversation(applicationId: string) {
+  // Check if conversation exists for this application
+  const { data: existing } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('application_id', applicationId)
+    .single();
+
+  if (existing) return { data: existing, error: null };
+
+  // Create new conversation
+  return supabase
+    .from('conversations')
+    .insert({ application_id: applicationId })
+    .select('id')
+    .single();
+}
+
+export async function getConversationMessages(conversationId: string) {
+  return supabase
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+}
+
+export async function sendMessage(conversationId: string, senderId: string, content: string) {
+  return supabase
+    .from('messages')
+    .insert({ conversation_id: conversationId, sender_id: senderId, content: content.trim() })
+    .select()
+    .single();
+}
+
+export async function markMessagesRead(conversationId: string, userId: string) {
+  return supabase
+    .from('messages')
+    .update({ is_read: true })
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', userId)
+    .eq('is_read', false);
 }

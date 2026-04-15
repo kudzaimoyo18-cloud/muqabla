@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Video, Camera, MapPin, Briefcase, Award, Edit3, Check, X, Plus,
   Loader2, ChevronRight, LogOut, Building2, Mail, Globe, Users, Calendar,
-  FileText, Image,
+  FileText, Image, Share2, Link as LinkIcon, Shield,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import {
@@ -13,7 +13,6 @@ import {
   getEmployerProfile, updateCompanyProfile,
 } from '@/lib/supabase/helpers';
 import { getVideoUrl, isR2Video } from '@/lib/cloudflare';
-import { supabase } from '@/lib/supabase/client';
 import { cities, countries, industries, companySizes } from '@/constants';
 import BottomNav from '@/components/layout/BottomNav';
 
@@ -30,6 +29,55 @@ interface CandidateData {
   ai_extracted_skills?: string[];
   profile_video_id?: string;
   linkedin_url?: string;
+  linkedin_verified?: boolean;
+  profile_video?: { cloudflare_uid?: string } | null;
+}
+
+// ======================== PROFILE COMPLETENESS ========================
+
+function getProfileCompleteness(candidate: CandidateData | null, profile: any): { score: number; missing: string[] } {
+  if (!candidate) return { score: 0, missing: ['Everything'] };
+  const checks: [boolean, string][] = [
+    [!!profile?.full_name, 'Full name'],
+    [!!candidate.headline, 'Headline'],
+    [!!candidate.current_title, 'Job title'],
+    [!!candidate.current_company, 'Company'],
+    [!!candidate.city, 'City'],
+    [(candidate.years_experience ?? 0) > 0, 'Experience'],
+    [(candidate.ai_extracted_skills?.length ?? 0) > 0, 'Skills'],
+    [!!candidate.profile_video_id, 'Profile video'],
+    [!!candidate.linkedin_url || !!candidate.linkedin_verified, 'LinkedIn'],
+  ];
+  const completed = checks.filter(([done]) => done).length;
+  const missing = checks.filter(([done]) => !done).map(([, label]) => label);
+  return { score: Math.round((completed / checks.length) * 100), missing };
+}
+
+function ProfileCompletenessBar({ score, missing }: { score: number; missing: string[] }) {
+  const color = score >= 80 ? 'emerald' : score >= 50 ? 'yellow' : 'red';
+  const colorMap = {
+    emerald: { bg: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500/20', bgLight: 'bg-emerald-500/10' },
+    yellow: { bg: 'bg-yellow-500', text: 'text-yellow-400', border: 'border-yellow-500/20', bgLight: 'bg-yellow-500/10' },
+    red: { bg: 'bg-red-500', text: 'text-red-400', border: 'border-red-500/20', bgLight: 'bg-red-500/10' },
+  };
+  const c = colorMap[color];
+
+  return (
+    <div className={`${c.bgLight} border ${c.border} rounded-xl p-4`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-white">Profile Strength</span>
+        <span className={`text-sm font-bold ${c.text}`}>{score}%</span>
+      </div>
+      <div className="w-full h-2 bg-white/[0.06] rounded-full overflow-hidden">
+        <div className={`h-full ${c.bg} rounded-full transition-all duration-500`} style={{ width: `${score}%` }} />
+      </div>
+      {missing.length > 0 && score < 100 && (
+        <p className="text-xs text-gray-500 mt-2">
+          Add {missing.slice(0, 3).join(', ')}{missing.length > 3 ? ` +${missing.length - 3} more` : ''} to boost your profile
+        </p>
+      )}
+    </div>
+  );
 }
 
 function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any; isSetup: boolean }) {
@@ -41,6 +89,12 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
   const [uploading, setUploading] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   const [skills, setSkills] = useState<string[]>([]);
+  const [referralEmail, setReferralEmail] = useState('');
+  const [referrals, setReferrals] = useState<any[]>([]);
+  const [referralStats, setReferralStats] = useState({ total: 0, signed_up: 0, applied: 0, hired: 0 });
+  const [referralLoading, setReferralLoading] = useState(false);
+  const [referralLink, setReferralLink] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [form, setForm] = useState({
     headline: '', current_title: '', current_company: '',
@@ -89,27 +143,102 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
     if (!file || !user?.id) return;
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'mp4';
-      const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(storagePath, file, { contentType: file.type || 'video/mp4', upsert: false });
-      if (uploadError) throw uploadError;
-      const res = await fetch('/api/upload', {
+      // 1. Request upload token
+      const tokenRes = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storagePath, type: 'profile_video' }),
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'video/mp4',
+          type: 'profile',
+        }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      await updateCandidateProfile(user.id, { profile_video_id: data.videoId });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || tokenData.error) {
+        throw new Error(tokenData.error || 'Failed to get upload token');
+      }
+      const { workerUrl, uploadToken, videoId } = tokenData;
+
+      // 2. PUT file directly to Cloudflare Worker
+      const putRes = await fetch(workerUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'video/mp4',
+          'X-Upload-Token': uploadToken,
+        },
+        body: file,
+      });
+      if (!putRes.ok) {
+        const errText = await putRes.text().catch(() => '');
+        throw new Error(`Upload failed (${putRes.status}): ${errText || 'no response body'}`);
+      }
+
+      // 3. Confirm upload
+      const confirmRes = await fetch('/api/upload/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId }),
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok || confirmData.error) {
+        throw new Error(confirmData.error || 'Failed to confirm upload');
+      }
+
+      await updateCandidateProfile(user.id, { profile_video_id: videoId });
       await loadProfile();
-    } catch { /* silent */ } finally { setUploading(false); }
+    } catch (err: any) {
+      console.error('Profile video upload failed:', err?.message || err);
+      alert(`Upload failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const addSkill = () => {
     const skill = newSkill.trim();
     if (skill && !skills.includes(skill)) { setSkills([...skills, skill]); setNewSkill(''); }
+  };
+
+  const loadReferrals = useCallback(async () => {
+    try {
+      const res = await fetch('/api/referrals');
+      if (res.ok) {
+        const data = await res.json();
+        setReferrals(data.referrals || []);
+        setReferralStats(data.stats || { total: 0, signed_up: 0, applied: 0, hired: 0 });
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { loadReferrals(); }, [loadReferrals]);
+
+  const handleReferral = async () => {
+    if (!referralEmail.trim()) return;
+    setReferralLoading(true);
+    try {
+      const res = await fetch('/api/referrals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referredEmail: referralEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setReferralLink(data.referralLink);
+      setReferralEmail('');
+      await loadReferrals();
+    } catch (err: any) {
+      alert(err.message || 'Failed to create referral');
+    } finally {
+      setReferralLoading(false);
+    }
+  };
+
+  const copyReferralLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch { /* silent */ }
   };
 
   if (loading) {
@@ -247,9 +376,32 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
                   <span>{profile.email}</span>
                 </div>
               )}
+              {/* LinkedIn badge */}
+              {candidate?.linkedin_verified && (
+                <div className="flex items-center gap-2 text-sm">
+                  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" fill="#0A66C2"/>
+                  </svg>
+                  <span className="text-[#0A66C2]">LinkedIn Verified</span>
+                  <Shield className="w-3 h-3 text-[#0A66C2]" />
+                </div>
+              )}
+              {candidate?.linkedin_url && !candidate?.linkedin_verified && (
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" fill="currentColor"/>
+                  </svg>
+                  <a href={candidate.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 truncate">LinkedIn Profile</a>
+                </div>
+              )}
             </>
           )}
         </div>
+
+        {/* Profile Completeness */}
+        {!editing && (
+          <ProfileCompletenessBar {...getProfileCompleteness(candidate, profile)} />
+        )}
 
         {/* Skills */}
         <div className="bg-[#111] border border-white/[0.06] rounded-xl p-4">
@@ -270,6 +422,105 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
             </div>
           )}
         </div>
+
+        {/* Referral System — Wasta */}
+        {!editing && (
+          <div className="bg-[#111] border border-white/[0.06] rounded-xl p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-medium text-white">Refer & Earn</h3>
+              </div>
+              {referralStats.total > 0 && (
+                <span className="text-xs text-gray-500">{referralStats.total} referral{referralStats.total !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-500 mb-4">
+              Know someone perfect for a job? Refer them and help them get hired. Wasta matters.
+            </p>
+
+            {/* Referral Stats */}
+            {referralStats.total > 0 && (
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-white">{referralStats.total}</div>
+                  <div className="text-[10px] text-gray-500">Sent</div>
+                </div>
+                <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-emerald-400">{referralStats.signed_up}</div>
+                  <div className="text-[10px] text-gray-500">Joined</div>
+                </div>
+                <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-blue-400">{referralStats.applied}</div>
+                  <div className="text-[10px] text-gray-500">Applied</div>
+                </div>
+                <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-yellow-400">{referralStats.hired}</div>
+                  <div className="text-[10px] text-gray-500">Hired</div>
+                </div>
+              </div>
+            )}
+
+            {/* Create Referral */}
+            <div className="flex items-center gap-2">
+              <input
+                type="email"
+                value={referralEmail}
+                onChange={(e) => setReferralEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleReferral())}
+                placeholder="Friend's email address"
+                className="flex-1 bg-[#0a0a0a] border border-white/[0.06] rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+              />
+              <button
+                onClick={handleReferral}
+                disabled={referralLoading || !referralEmail.trim()}
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 rounded-lg text-sm text-white font-medium transition-colors whitespace-nowrap"
+              >
+                {referralLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Refer'}
+              </button>
+            </div>
+
+            {/* Generated Link */}
+            {referralLink && (
+              <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
+                <p className="text-xs text-emerald-400 mb-2">Referral link created! Share it:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs text-white bg-[#0a0a0a] rounded px-2 py-1.5 truncate">{referralLink}</code>
+                  <button
+                    onClick={() => copyReferralLink(referralLink)}
+                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 rounded text-xs text-white font-medium transition-colors"
+                  >
+                    {linkCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Referrals */}
+            {referrals.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h4 className="text-xs text-gray-500 font-medium">Recent Referrals</h4>
+                {referrals.slice(0, 5).map((ref: any) => (
+                  <div key={ref.id} className="flex items-center justify-between bg-[#0a0a0a] rounded-lg px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-white truncate">{ref.referred_email}</p>
+                      {ref.job?.title && <p className="text-[10px] text-gray-500 truncate">for {ref.job.title}</p>}
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ml-2 ${
+                      ref.status === 'hired' ? 'bg-yellow-500/10 text-yellow-400' :
+                      ref.status === 'applied' ? 'bg-blue-500/10 text-blue-400' :
+                      ref.status === 'signed_up' ? 'bg-emerald-500/10 text-emerald-400' :
+                      'bg-gray-500/10 text-gray-400'
+                    }`}>
+                      {ref.status === 'signed_up' ? 'Joined' : ref.status.charAt(0).toUpperCase() + ref.status.slice(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
@@ -384,22 +635,55 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
     if (!file || !employer?.company_id || !user?.id) return;
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'mp4';
-      const storagePath = `${user.id}/${crypto.randomUUID()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(storagePath, file, { contentType: file.type || 'video/mp4', upsert: false });
-      if (uploadError) throw uploadError;
-      const res = await fetch('/api/upload', {
+      // 1. Request upload token
+      const tokenRes = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storagePath, type: 'company_intro' }),
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'video/mp4',
+          type: 'company_intro',
+        }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      await updateCompanyProfile(employer.company_id, { intro_video_id: data.videoId });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || tokenData.error) {
+        throw new Error(tokenData.error || 'Failed to get upload token');
+      }
+      const { workerUrl, uploadToken, videoId } = tokenData;
+
+      // 2. PUT file directly to Cloudflare Worker
+      const putRes = await fetch(workerUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'video/mp4',
+          'X-Upload-Token': uploadToken,
+        },
+        body: file,
+      });
+      if (!putRes.ok) {
+        const errText = await putRes.text().catch(() => '');
+        throw new Error(`Upload failed (${putRes.status}): ${errText || 'no response body'}`);
+      }
+
+      // 3. Confirm upload
+      const confirmRes = await fetch('/api/upload/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId }),
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok || confirmData.error) {
+        throw new Error(confirmData.error || 'Failed to confirm upload');
+      }
+
+      await updateCompanyProfile(employer.company_id, { intro_video_id: videoId });
       await loadProfile();
-    } catch { /* silent */ } finally { setUploading(false); }
+    } catch (err: any) {
+      console.error('Company video upload failed:', err?.message || err);
+      alert(`Upload failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (loading) {

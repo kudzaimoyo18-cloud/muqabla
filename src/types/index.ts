@@ -164,3 +164,27 @@ export interface CompanySize {
   min_employees: number
   max_employees: number
 }
+
+export interface Message {
+  id: string
+  conversation_id: string
+  sender_id: string
+  content: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface Referral {
+  id: string
+  referrer_id: string
+  referred_email: string
+  referred_user_id?: string
+  job_id?: string
+  referral_code: string
+  status: 'pending' | 'signed_up' | 'applied' | 'hired'
+  created_at: string
+  converted_at?: string
+  // joined data
+  job?: Pick<Job, 'id' | 'title' | 'company_id'>
+  referred_user?: Pick<User, 'id' | 'full_name' | 'avatar_url'>
+}

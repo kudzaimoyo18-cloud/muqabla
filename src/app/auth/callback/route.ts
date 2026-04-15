@@ -52,7 +52,12 @@ export async function GET(request: NextRequest) {
 
       if (!existingUser) {
         // New user — redirect to role selection (keep the auth cookies!)
+        // Pass the provider so we can set linkedin_verified if they signed in via LinkedIn
+        const provider = sessionData.user.app_metadata?.provider || '';
         const roleUrl = new URL('/auth/role', request.url);
+        if (provider === 'linkedin_oidc') {
+          roleUrl.searchParams.set('provider', 'linkedin');
+        }
         const roleResponse = NextResponse.redirect(roleUrl);
         // Copy auth cookies with security flags
         response.cookies.getAll().forEach((cookie) => {
