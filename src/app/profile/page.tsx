@@ -15,6 +15,7 @@ import {
 import { getVideoUrl, isR2Video } from '@/lib/cloudflare';
 import { cities, countries, industries, companySizes } from '@/constants';
 import BottomNav from '@/components/layout/BottomNav';
+import Avatar from '@/components/ui/Avatar';
 
 // ======================== CANDIDATE PROFILE ========================
 
@@ -348,9 +349,17 @@ function CandidateProfile({ user, profile, isSetup }: { user: any; profile: any;
             </>
           ) : (
             <>
-              <div>
-                <h2 className="text-xl font-bold text-white">{profile?.full_name || 'Your Name'}</h2>
-                {candidate?.headline && <p className="text-sm text-emerald-400 mt-0.5">{candidate.headline}</p>}
+              <div className="flex items-center gap-4">
+                <Avatar
+                  src={profile?.avatar_url}
+                  name={profile?.full_name}
+                  size="xl"
+                  ring={candidate?.linkedin_verified ? 'blue' : 'none'}
+                />
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-bold text-white">{profile?.full_name || 'Your Name'}</h2>
+                  {candidate?.headline && <p className="text-sm text-emerald-400 mt-0.5">{candidate.headline}</p>}
+                </div>
               </div>
               {(candidate?.current_title || candidate?.current_company) && (
                 <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -801,11 +810,14 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
             </>
           ) : (
             <>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center shrink-0">
-                  <Building2 className="w-6 h-6 text-emerald-400" />
-                </div>
-                <div>
+              <div className="flex items-center gap-4">
+                <Avatar
+                  src={profile?.avatar_url}
+                  name={profile?.full_name}
+                  size="xl"
+                  ring={company?.is_verified ? 'emerald' : 'none'}
+                />
+                <div className="flex-1 min-w-0">
                   <h2 className="text-xl font-bold text-white">{company?.name || 'Company Name'}</h2>
                   {company?.industry && <p className="text-sm text-emerald-400">{company.industry}</p>}
                 </div>

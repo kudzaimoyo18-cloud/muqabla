@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     if (sessionData?.user) {
       const { data: existingUser } = await supabase
         .from('users')
-        .select('id')
+        .select('id, avatar_url')
         .eq('id', sessionData.user.id)
         .single();
 
@@ -64,6 +64,17 @@ export async function GET(request: NextRequest) {
           roleResponse.cookies.set(cookie.name, cookie.value, secureCookieOptions());
         });
         return roleResponse;
+      } else {
+        // Returning user — sync avatar from OAuth if not set yet
+        const oauthAvatar = sessionData.user.user_metadata?.avatar_url
+          || sessionData.user.user_metadata?.picture
+          || null;
+        if (oauthAvatar && !existingUser.avatar_url) {
+          await supabase
+            .from('users')
+            .update({ avatar_url: oauthAvatar })
+            .eq('id', sessionData.user.id);
+        }
       }
     }
   }

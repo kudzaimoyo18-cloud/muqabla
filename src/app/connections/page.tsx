@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { supabase } from '@/lib/supabase/client';
 import BottomNav from '@/components/layout/BottomNav';
+import Avatar from '@/components/ui/Avatar';
 
 interface Connection {
   id: string;
@@ -109,7 +110,7 @@ export default function ConnectionsPage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
@@ -124,9 +125,7 @@ export default function ConnectionsPage() {
           <div className="divide-y divide-white/[0.04]">
             {filtered.map((conn) => (
               <div key={conn.id} className="px-4 py-3.5 flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center shrink-0">
-                  <Users className="w-4 h-4 text-emerald-400" />
-                </div>
+                <Avatar src={conn.avatar_url} name={conn.full_name} size="md" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{conn.full_name}</p>
                   {conn.headline && (
@@ -149,7 +148,7 @@ export default function ConnectionsPage() {
         )}
       </div>
 
-      <BottomNav variant={profile?.type === 'employer' ? 'employer' : 'candidate'} />
+      <BottomNav />
     </div>
   );
 }

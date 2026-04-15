@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, MessageSquare, User, Plus, Users, LayoutDashboard } from 'lucide-react';
+import { Home, Search, MessageSquare, Plus, Users, LayoutDashboard } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth-store';
+import Avatar from '@/components/ui/Avatar';
 
 const candidateNav = [
   { href: '/feed', label: 'Home', icon: Home },
   { href: '/search', label: 'Discover', icon: Search },
   { href: '/messages', label: 'Inbox', icon: MessageSquare },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/profile', label: 'Profile', icon: null },
 ];
 
 const employerNav = [
@@ -16,18 +18,20 @@ const employerNav = [
   { href: '/employer/post-job', label: 'Post', icon: Plus },
   { href: '/employer/candidates', label: 'Candidates', icon: Users },
   { href: '/messages', label: 'Inbox', icon: MessageSquare },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/profile', label: 'Profile', icon: null },
 ];
 
-export default function BottomNav({ variant = 'candidate' }: { variant?: 'candidate' | 'employer' }) {
+export default function BottomNav() {
   const pathname = usePathname();
-  const items = variant === 'employer' ? employerNav : candidateNav;
+  const { profile } = useAuthStore();
+  const items = profile?.type === 'employer' ? employerNav : candidateNav;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/[0.06]">
-      <div className="flex items-center justify-around px-2 py-2 max-w-lg mx-auto">
+      <div className="flex items-center justify-around px-2 py-2 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
         {items.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          const isProfile = item.href === '/profile';
           return (
             <Link
               key={item.href}
@@ -36,9 +40,18 @@ export default function BottomNav({ variant = 'candidate' }: { variant?: 'candid
                 isActive ? 'text-emerald-400' : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : ''}`} />
+              {isProfile ? (
+                <Avatar
+                  src={profile?.avatar_url}
+                  name={profile?.full_name}
+                  size="xs"
+                  ring={isActive ? 'emerald' : 'none'}
+                />
+              ) : item.icon ? (
+                <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : ''}`} />
+              ) : null}
               <span className="text-[10px] font-medium">{item.label}</span>
-              {isActive && <div className="w-1 h-1 bg-emerald-400 rounded-full" />}
+              {isActive && !isProfile && <div className="w-1 h-1 bg-emerald-400 rounded-full" />}
             </Link>
           );
         })}

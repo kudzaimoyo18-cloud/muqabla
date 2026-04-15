@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { supabase } from '@/lib/supabase/client';
 import BottomNav from '@/components/layout/BottomNav';
+import Avatar from '@/components/ui/Avatar';
 
 interface Conversation {
   id: string;
@@ -17,7 +18,7 @@ interface Conversation {
   last_message_at?: string;
   other_party_name: string;
   job_title: string;
-  unread: boolean;
+  unread_count: number;
 }
 
 function timeAgo(date: string) {
@@ -67,13 +68,41 @@ export default function MessagesPage() {
                   .single();
                 if (company) companyName = company.name;
               }
+              // Get last message and unread count
+              const { data: lastMsg } = await supabase
+                .from('conversations')
+                .select('id')
+                .eq('application_id', app.id)
+                .single();
+              let lastMessage: string | undefined;
+              let lastMessageAt: string | undefined;
+              let unreadCount = 0;
+              if (lastMsg) {
+                const { data: msg } = await supabase
+                  .from('messages')
+                  .select('content, created_at')
+                  .eq('conversation_id', lastMsg.id)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .single();
+                if (msg) { lastMessage = msg.content; lastMessageAt = msg.created_at; }
+                const { count } = await supabase
+                  .from('messages')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('conversation_id', lastMsg.id)
+                  .neq('sender_id', user!.id)
+                  .eq('is_read', false);
+                unreadCount = count || 0;
+              }
               return {
                 id: app.id,
                 application_id: app.id,
                 created_at: app.created_at,
+                last_message: lastMessage,
+                last_message_at: lastMessageAt,
                 other_party_name: companyName,
                 job_title: job?.title || 'Job',
-                unread: false,
+                unread_count: unreadCount,
               };
             })
           );
@@ -112,13 +141,41 @@ export default function MessagesPage() {
                     .select('full_name')
                     .eq('id', app.candidate_id)
                     .single();
+                  // Get last message and unread count
+                  const { data: convoRecord } = await supabase
+                    .from('conversations')
+                    .select('id')
+                    .eq('application_id', app.id)
+                    .single();
+                  let lastMessage: string | undefined;
+                  let lastMessageAt: string | undefined;
+                  let unreadCount = 0;
+                  if (convoRecord) {
+                    const { data: msg } = await supabase
+                      .from('messages')
+                      .select('content, created_at')
+                      .eq('conversation_id', convoRecord.id)
+                      .order('created_at', { ascending: false })
+                      .limit(1)
+                      .single();
+                    if (msg) { lastMessage = msg.content; lastMessageAt = msg.created_at; }
+                    const { count } = await supabase
+                      .from('messages')
+                      .select('*', { count: 'exact', head: true })
+                      .eq('conversation_id', convoRecord.id)
+                      .neq('sender_id', user!.id)
+                      .eq('is_read', false);
+                    unreadCount = count || 0;
+                  }
                   return {
                     id: app.id,
                     application_id: app.id,
                     created_at: app.created_at,
+                    last_message: lastMessage,
+                    last_message_at: lastMessageAt,
                     other_party_name: userData?.full_name || 'Candidate',
                     job_title: jobMap[app.job_id] || 'Job',
-                    unread: false,
+                    unread_count: unreadCount,
                   };
                 })
               );
@@ -158,7 +215,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Conversations */}
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
@@ -178,26 +235,27 @@ export default function MessagesPage() {
             {filtered.map((convo) => (
               <div
                 key={convo.id}
+                onClick={() => router.push(`/messages/${convo.id}`)}
                 className="px-4 py-3.5 flex items-center gap-3 hover:bg-white/[0.02] transition-colors cursor-pointer"
               >
-                <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center shrink-0">
-                  <Briefcase className="w-4 h-4 text-emerald-400" />
-                </div>
+                <Avatar src={null} name={convo.other_party_name} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className={`text-sm truncate ${convo.unread ? 'font-semibold text-white' : 'font-medium text-gray-300'}`}>
+                    <p className={`text-sm truncate ${convo.unread_count > 0 ? 'font-semibold text-white' : 'font-medium text-gray-300'}`}>
                       {convo.other_party_name}
                     </p>
                     <span className="text-[10px] text-gray-600 ml-2 shrink-0">
-                      {timeAgo(convo.created_at)}
+                      {timeAgo(convo.last_message_at || convo.created_at)}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 truncate mt-0.5">
-                    {convo.job_title}
+                    {convo.last_message || convo.job_title}
                   </p>
                 </div>
-                {convo.unread && (
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
+                {convo.unread_count > 0 && (
+                  <div className="min-w-[18px] h-[18px] bg-emerald-500 rounded-full flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-white">{convo.unread_count}</span>
+                  </div>
                 )}
               </div>
             ))}
@@ -205,7 +263,7 @@ export default function MessagesPage() {
         )}
       </div>
 
-      <BottomNav variant={profile?.type === 'employer' ? 'employer' : 'candidate'} />
+      <BottomNav />
     </div>
   );
 }

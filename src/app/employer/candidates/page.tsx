@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search, Filter, Users, Loader2, Play, MapPin, ArrowLeft,
-  LayoutGrid, List, ChevronDown,
+  LayoutGrid, List, ChevronDown, MessageSquare,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { getEmployerProfile } from '@/lib/supabase/helpers';
 import { getVideoUrl, isR2Video } from '@/lib/cloudflare';
 import { supabase } from '@/lib/supabase/client';
 import BottomNav from '@/components/layout/BottomNav';
+import Avatar from '@/components/ui/Avatar';
 
 interface CandidateApplication {
   id: string;
@@ -199,7 +200,7 @@ export default function CandidatesPage() {
       )}
 
       {/* Content */}
-      <div className="px-4 max-w-lg mx-auto">
+      <div className="px-4 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
@@ -214,10 +215,13 @@ export default function CandidatesPage() {
             {filtered.map((c) => (
               <div key={c.id} className="bg-[#111] border border-white/[0.06] rounded-xl p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-[15px] font-semibold text-white truncate">{c.full_name}</h3>
-                    {c.headline && <p className="text-xs text-gray-400 mt-0.5 truncate">{c.headline}</p>}
-                    <p className="text-[11px] text-gray-600 mt-1">Applied for: {c.job_title}</p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Avatar src={c.avatar_url} name={c.full_name} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[15px] font-semibold text-white truncate">{c.full_name}</h3>
+                      {c.headline && <p className="text-xs text-gray-400 mt-0.5 truncate">{c.headline}</p>}
+                      <p className="text-[11px] text-gray-600 mt-1">Applied for: {c.job_title}</p>
+                    </div>
                   </div>
                   {c.cloudflare_uid && (
                     <button
@@ -250,15 +254,26 @@ export default function CandidatesPage() {
                 )}
 
                 <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
-                  <select
-                    value={c.status}
-                    onChange={(e) => handleStatusChange(c.id, e.target.value)}
-                    className={`px-2 py-1 rounded text-[11px] font-medium border capitalize focus:outline-none ${STATUS_COLORS[c.status] || 'text-gray-400 bg-gray-400/10 border-gray-400/20'}`}
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={c.status}
+                      onChange={(e) => handleStatusChange(c.id, e.target.value)}
+                      className={`px-2 py-1 rounded text-[11px] font-medium border capitalize focus:outline-none ${STATUS_COLORS[c.status] || 'text-gray-400 bg-gray-400/10 border-gray-400/20'}`}
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                      ))}
+                    </select>
+                    {!['pending', 'rejected'].includes(c.status) && (
+                      <button
+                        onClick={() => router.push(`/messages/${c.id}`)}
+                        className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        Message
+                      </button>
+                    )}
+                  </div>
                   <span className="text-[10px] text-gray-600">
                     {new Date(c.created_at).toLocaleDateString()}
                   </span>
@@ -282,6 +297,14 @@ export default function CandidatesPage() {
                     <Play className="w-3 h-3 text-emerald-400" />
                   </button>
                 )}
+                {!['pending', 'rejected'].includes(c.status) && (
+                  <button
+                    onClick={() => router.push(`/messages/${c.id}`)}
+                    className="w-7 h-7 bg-emerald-500/10 rounded-full flex items-center justify-center"
+                  >
+                    <MessageSquare className="w-3 h-3 text-emerald-400" />
+                  </button>
+                )}
                 <select
                   value={c.status}
                   onChange={(e) => handleStatusChange(c.id, e.target.value)}
@@ -297,7 +320,7 @@ export default function CandidatesPage() {
         )}
       </div>
 
-      <BottomNav variant="employer" />
+      <BottomNav />
     </div>
   );
 }

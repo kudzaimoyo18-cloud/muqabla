@@ -4,18 +4,33 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Briefcase, Users, Eye, TrendingUp, Plus, ChevronRight, Loader2,
-  Clock, CheckCircle, UserCheck,
+  Clock, CheckCircle, UserCheck, Pause, Play, XCircle, MapPin,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { supabase } from '@/lib/supabase/client';
 import { getEmployerProfile } from '@/lib/supabase/helpers';
 import BottomNav from '@/components/layout/BottomNav';
+import Avatar from '@/components/ui/Avatar';
 
 interface DashboardStats {
   activeJobs: number;
   totalApplicants: number;
   newToday: number;
   totalViews: number;
+}
+
+interface PostedJob {
+  id: string;
+  title: string;
+  status: string;
+  city: string;
+  country: string;
+  job_type: string;
+  salary_min?: number;
+  salary_max?: number;
+  salary_currency: string;
+  applications_count: number;
+  created_at: string;
 }
 
 interface RecentApplicant {
@@ -32,9 +47,11 @@ export default function EmployerDashboardPage() {
   const router = useRouter();
   const { user, profile, initialize } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats>({ activeJobs: 0, totalApplicants: 0, newToday: 0, totalViews: 0 });
+  const [postedJobs, setPostedJobs] = useState<PostedJob[]>([]);
   const [recentApplicants, setRecentApplicants] = useState<RecentApplicant[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [updatingJobId, setUpdatingJobId] = useState<string | null>(null);
 
   useEffect(() => { initialize(); }, [initialize]);
 
@@ -62,9 +79,11 @@ export default function EmployerDashboardPage() {
 
       const { data: companyJobs } = await supabase
         .from('jobs')
-        .select('id')
-        .eq('company_id', companyId);
+        .select('id, title, status, city, country, job_type, salary_min, salary_max, salary_currency, applications_count, created_at')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
 
+      setPostedJobs((companyJobs as PostedJob[]) || []);
       const jobIds = companyJobs?.map((j) => j.id) || [];
 
       let totalApplicants = 0;
@@ -146,6 +165,56 @@ export default function EmployerDashboardPage() {
     hired: 'text-green-400 bg-green-400/10',
   };
 
+  const JOB_STATUS_COLORS: Record<string, string> = {
+    active: 'text-emerald-400 bg-emerald-400/10',
+    paused: 'text-yellow-400 bg-yellow-400/10',
+    closed: 'text-gray-400 bg-gray-400/10',
+    draft: 'text-blue-400 bg-blue-400/10',
+  };
+
+  const JOB_TYPE_LABELS: Record<string, string> = {
+    full_time: 'Full Time', part_time: 'Part Time', contract: 'Contract',
+    freelance: 'Freelance', internship: 'Internship',
+  };
+
+  const formatSalary = (min?: number, max?: number, currency = 'AED') => {
+    const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : n.toString();
+    if (min && max) return `${currency} ${fmt(min)} - ${fmt(max)}`;
+    if (min) return `${currency} ${fmt(min)}+`;
+    if (max) return `Up to ${currency} ${fmt(max)}`;
+    return null;
+  };
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return '1d ago';
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  };
+
+  const updateJobStatus = async (jobId: string, newStatus: string) => {
+    setUpdatingJobId(jobId);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setPostedJobs((prev) =>
+          prev.map((j) => j.id === jobId ? { ...j, status: newStatus } : j)
+        );
+        if (newStatus === 'active') setStats((s) => ({ ...s, activeJobs: s.activeJobs + 1 }));
+        else setStats((s) => ({ ...s, activeJobs: Math.max(0, s.activeJobs - 1) }));
+      }
+    } catch { /* ignore */ } finally {
+      setUpdatingJobId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">
       {/* Header */}
@@ -154,7 +223,7 @@ export default function EmployerDashboardPage() {
         <h1 className="text-xl font-bold text-white">{companyName || profile?.full_name || 'Dashboard'}</h1>
       </div>
 
-      <div className="px-4 max-w-lg mx-auto space-y-4">
+      <div className="px-4 max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto space-y-4">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -191,6 +260,93 @@ export default function EmployerDashboardPage() {
           </button>
         </div>
 
+        {/* My Posted Jobs */}
+        <div className="bg-[#111] border border-white/[0.06] rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+            <h3 className="text-sm font-medium text-white">
+              My Posted Jobs {postedJobs.length > 0 && <span className="text-gray-500">({postedJobs.length})</span>}
+            </h3>
+          </div>
+
+          {postedJobs.length === 0 ? (
+            <div className="px-4 py-8 text-center">
+              <Briefcase className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+              <p className="text-xs text-gray-600 mb-3">You haven&apos;t posted any jobs yet</p>
+              <button
+                onClick={() => router.push('/employer/post-job')}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-medium"
+              >
+                Post Your First Job
+              </button>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/[0.04]">
+              {postedJobs.map((job) => {
+                const salary = formatSalary(job.salary_min, job.salary_max, job.salary_currency);
+                return (
+                  <div key={job.id} className="px-4 py-4">
+                    {/* Row 1: Title + Status */}
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="text-sm font-medium text-white leading-tight flex-1 min-w-0 mr-3">{job.title}</h4>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium capitalize shrink-0 ${JOB_STATUS_COLORS[job.status] || 'text-gray-400 bg-gray-400/10'}`}>
+                        {job.status}
+                      </span>
+                    </div>
+
+                    {/* Row 2: Meta info */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mb-3">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {job.city}{job.country ? `, ${job.country}` : ''}
+                      </span>
+                      <span>{JOB_TYPE_LABELS[job.job_type] || job.job_type}</span>
+                      {salary && <span>{salary}</span>}
+                      <span>{job.applications_count || 0} applicant{job.applications_count === 1 ? '' : 's'}</span>
+                      <span>Posted {timeAgo(job.created_at)}</span>
+                    </div>
+
+                    {/* Row 3: Actions */}
+                    <div className="flex items-center gap-2">
+                      {job.status === 'active' ? (
+                        <button
+                          onClick={() => updateJobStatus(job.id, 'paused')}
+                          disabled={updatingJobId === job.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-yellow-400/10 hover:bg-yellow-400/20 rounded-md text-[11px] font-medium text-yellow-400 transition-colors disabled:opacity-50"
+                        >
+                          <Pause className="w-3 h-3" /> Pause
+                        </button>
+                      ) : job.status === 'paused' ? (
+                        <button
+                          onClick={() => updateJobStatus(job.id, 'active')}
+                          disabled={updatingJobId === job.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-400/10 hover:bg-emerald-400/20 rounded-md text-[11px] font-medium text-emerald-400 transition-colors disabled:opacity-50"
+                        >
+                          <Play className="w-3 h-3" /> Activate
+                        </button>
+                      ) : null}
+                      {job.status !== 'closed' && (
+                        <button
+                          onClick={() => updateJobStatus(job.id, 'closed')}
+                          disabled={updatingJobId === job.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-400/10 hover:bg-gray-400/20 rounded-md text-[11px] font-medium text-gray-400 transition-colors disabled:opacity-50"
+                        >
+                          <XCircle className="w-3 h-3" /> Close
+                        </button>
+                      )}
+                      <button
+                        onClick={() => router.push(`/employer/candidates?job=${job.id}`)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#0a0a0a] border border-white/[0.06] hover:border-white/[0.12] rounded-md text-[11px] font-medium text-white transition-colors ml-auto"
+                      >
+                        View Applicants <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Recent Applicants */}
         <div className="bg-[#111] border border-white/[0.06] rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
@@ -208,7 +364,8 @@ export default function EmployerDashboardPage() {
           ) : (
             <div className="divide-y divide-white/[0.04]">
               {recentApplicants.map((app) => (
-                <div key={app.id} className="px-4 py-3 flex items-center justify-between">
+                <div key={app.id} className="px-4 py-3 flex items-center gap-3">
+                  <Avatar src={app.user?.avatar_url} name={app.user?.full_name} size="sm" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{app.user?.full_name || 'Candidate'}</p>
                     <p className="text-xs text-gray-500 truncate">
@@ -225,7 +382,7 @@ export default function EmployerDashboardPage() {
         </div>
       </div>
 
-      <BottomNav variant="employer" />
+      <BottomNav />
     </div>
   );
 }
