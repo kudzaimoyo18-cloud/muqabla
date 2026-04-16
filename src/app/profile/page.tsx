@@ -10,7 +10,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import {
   getCandidateProfile, updateCandidateProfile, updateUserProfile,
-  getEmployerProfile, updateCompanyProfile,
+  getEmployerProfile,
 } from '@/lib/supabase/helpers';
 import { getVideoUrl, isR2Video } from '@/lib/cloudflare';
 import { cities, countries, industries, companySizes } from '@/constants';
@@ -617,17 +617,26 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
         if (userErr) throw new Error(userErr.message || 'Failed to update name');
       }
 
-      const { error: compErr } = await updateCompanyProfile(employer.company_id, {
-        name: form.company_name,
-        industry: form.industry,
-        size: form.size,
-        founded_year: form.founded_year ? parseInt(form.founded_year) : null,
-        website: form.website,
-        description: form.description,
-        headquarters: form.headquarters,
+      const compRes = await fetch('/api/employer/company', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: employer.company_id,
+          updates: {
+            name: form.company_name,
+            industry: form.industry,
+            size: form.size,
+            founded_year: form.founded_year ? parseInt(form.founded_year) : null,
+            website: form.website,
+            description: form.description,
+            headquarters: form.headquarters,
+          },
+        }),
       });
-
-      if (compErr) throw new Error(compErr.message || 'Failed to save company info');
+      const compData = await compRes.json();
+      if (!compRes.ok || compData.error) {
+        throw new Error(compData.error || 'Failed to save company info');
+      }
 
       await loadProfile();
       setEditing(false);
@@ -685,7 +694,18 @@ function EmployerProfile({ user, profile, isSetup }: { user: any; profile: any; 
         throw new Error(confirmData.error || 'Failed to confirm upload');
       }
 
-      await updateCompanyProfile(employer.company_id, { intro_video_id: videoId });
+      const linkRes = await fetch('/api/employer/company', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: employer.company_id,
+          updates: { intro_video_id: videoId },
+        }),
+      });
+      const linkData = await linkRes.json();
+      if (!linkRes.ok || linkData.error) {
+        throw new Error(linkData.error || 'Failed to link video to company');
+      }
       await loadProfile();
     } catch (err: any) {
       console.error('Company video upload failed:', err?.message || err);
