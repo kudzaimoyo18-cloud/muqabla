@@ -47,3 +47,10 @@ Thumbs.db
 *.mov
 *.avi
 *.mkv
+
+# Allow landing page demo videos + posters through
+!public/demos/*.mp4
+!public/demos/*.jpg
+
+# Exclude the Remotion project entirely (raw footage + source used only for authoring)
+remotion/
