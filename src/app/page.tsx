@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Video, ArrowRight, Zap, Shield, Globe, Play, Users, Briefcase, CheckCircle, ChevronDown } from 'lucide-react';
 import RealismButton from '@/components/ui/RealismButton';
+import DemoModal from '@/components/ui/DemoModal';
 
 const ParticleTextEffect = dynamic(
   () => import('@/components/ui/ParticleTextEffect').then(mod => ({ default: mod.ParticleTextEffect })),
@@ -11,6 +13,8 @@ const ParticleTextEffect = dynamic(
 );
 
 export default function LandingPage() {
+  const [demoOpen, setDemoOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       {/* Navigation */}
@@ -39,7 +43,20 @@ export default function LandingPage() {
         {/* Particle canvas as background */}
         <div className="absolute inset-0 flex items-center justify-center opacity-40">
           <ParticleTextEffect
-            words={["MUQABLA", "مقابلة", "INTERVIEW"]}
+            words={[
+              "MUQABLA",
+              "مقابلة",
+              "इंटरव्यू",
+              "انٹرویو",
+              "PANAYAM",
+              "ഇന്റർവ്യൂ",
+              "நேர்காணல்",
+              "ইন্টারভিউ",
+              "مصاحبه",
+              "NHAURIRANO",
+              "MAHOJIANO",
+              "INTERVIEW",
+            ]}
             className="w-full h-full"
           />
         </div>
@@ -67,7 +84,12 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row gap-5 justify-center mb-16">
             <RealismButton text="Start Free" href="/auth/signup" icon={<ArrowRight className="w-4 h-4" />} />
-            <RealismButton text="Watch Demo" href="/auth/login" variant="secondary" icon={<Play className="w-4 h-4" />} />
+            <RealismButton
+              text="Watch Demo"
+              onClick={() => setDemoOpen(true)}
+              variant="secondary"
+              icon={<Play className="w-4 h-4" />}
+            />
           </div>
 
           {/* Stats */}
@@ -283,6 +305,8 @@ export default function LandingPage() {
           <p className="text-xs text-gray-600">&copy; {new Date().getFullYear()} Muqabla. Built for the GCC.</p>
         </div>
       </footer>
+
+      <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
     </div>
   );
 }
